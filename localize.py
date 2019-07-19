@@ -80,3 +80,41 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
+
+
+class Microphone:
+	def __init__(self, location=[0.0, 0.0, 0.0], channel=1, wave=null):
+		self.position = position
+		self.channel = channel
+		self.wave=dsp.read_wave(filename=filename, channel = self.channel)
+
+	def setwave(filename='sound.wav'):
+		wave = dsp.read_wave(filename=filename, channel = self.channel)
+
+	def apply_filter(pass_band = []):
+		'''
+		assumed always using the band_pass filter
+		'''
+		self.wave.band_pass(range = pass_band)
+
+class Emitter:
+	def __init__(self, location=[0.0, 0.0, 0.0], filename ='sound.wav', noiselevel=0, tentry=0, texit=0):
+		self.location = location
+		self.filename = filename
+		self.noiselevel = noiselevel
+		self.tentry =tentry
+		self.texit = texit
+
+	def new_file(filename='sound.wav'):
+		signal = dsp.read_wave(filename = filename)
+
+		#padding entry and exit time
+		pad_front = np.zeros(signal.framerate * tentry)
+		pad_back = np.zeros(signal.framerate * texit)
+		np.concatenate([pad_front, signal, pad_back])
+
+		#add noise
+		
+
+
+
