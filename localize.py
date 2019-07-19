@@ -80,3 +80,49 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
+
+
+class SensorArray:
+    """Object to represent and Array of Sensors
+    Provides the functuonality to localize
+    """
+    def __init__(self, mic_array, pass_band, soundfile):
+        """Assumes: mic_array is a list of microphone objects
+                    pos_source indicates the initial position of source and is
+                        initialized to (0,0,0) by default
+                    pass_band is a list of two elements indicating lower
+                        and upper bounds"""
+
+        self.micarray = mic_array
+        self.passband = pass_band
+        self.sourcepos = np.array([0, 0, 0])
+        self.file = ""
+
+
+    def get_micarray():
+        return  self.mic_array
+
+    def get_passband():
+        return get_pass_band
+
+    def get_sourcepos():
+        return self.sourcepos.tolist()
+
+    def get_file():
+        return self.file
+
+    def set_file(filename):
+        """Sets the name of the file to analyze and initializes the wave instance
+                variables in the microphone objects and applies the filtering.
+            Assumes: filename is a string in wav format and uses the specified passband
+        """
+        self.file = filename
+        for mic in micarray:
+            mic.
+
+    def filter_all():
+        """Applies a band pass filter to all of the microphones in the list"""
+
+
+
+    def plot():
