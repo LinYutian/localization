@@ -114,7 +114,4 @@ class Emitter:
 		np.concatenate([pad_front, signal, pad_back])
 
 		#add noise
-		
-
-
-
+        signal.ys = signal.ys + np.random.normal(scale = noise_level, size = len(signal.ys))
