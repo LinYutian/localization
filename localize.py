@@ -56,6 +56,16 @@ def sdoa(wave1, wave2,pass_band = []):
 
     return correlate(h1,h2)
 
+def tdoa(wave1, wave2,speed = 1500, pass_band):
+    """
+    A simple wrapper for sdoa that changes units to seconds. Used only as a matter of
+    convinicience
+    """
+    samples = sdoa(wave1, wave2, pass_band)
+    return (samples/wave1.framerate)*speed
+
+
+
 def hplot(wave1, wave2, pass_band = []):
     """
     Assummes
@@ -86,18 +96,21 @@ class SensorArray:
     """Object to represent and Array of Sensors
     Provides the functuonality to localize
     """
-    def __init__(self, mic_array, pass_band, soundfile):
+    def __init__(self, mic_array, pass_band, soundfile = ""):
         """Assumes: mic_array is a list of microphone objects
-                    pos_source indicates the initial position of source and is
-                        initialized to (0,0,0) by default
-                    pass_band is a list of two elements indicating lower
-                        and upper bounds"""
+                    pos_source indicates the initial position of source and isinitialized to (0,0,0)
+                    by default
+                    pass_band is a list of two elements indicating lower and
+                    upper bounds"""
 
         self.micarray = mic_array
         self.passband = pass_band
-        self.sourcepos = np.array([0, 0, 0])
-        self.file = ""
+        self.sourcepos = [0, 0, 0]
+        self.file = soundfile
 
+        #Immidiately applies the filter to the microphoness
+        if(self.file != ""):
+            self.set_file(soundfile)
 
     def get_micarray():
         return  self.mic_array
@@ -109,6 +122,7 @@ class SensorArray:
         return self.sourcepos.tolist()
 
     def get_file():
+        "Returns the name of the file with which "
         return self.file
 
     def set_file(filename):
@@ -116,22 +130,95 @@ class SensorArray:
                 variables in the microphone objects and applies the filtering.
             Assumes: filename is a string in wav format and uses the specified passband
         """
-        
-        
+        self.file = filename
+        for mic in self.micarray:
+            mic.set_wave(self.file)
+        self.apply_filter()
+
+    def apply_filter():
+        """Applies the the band_pass filter with the set pass_band to
+            each of the microphones"""
+        for mic in micarray:
+            mic.apply_filter(range = range)
+
+    def plot(error = 2, show = True, save = False, additional = [],  title = "plot.png"):
+        """
+        Plots the current position of the microphones and the estimated position of the source
+        Assumes:
+            error: Number of meters that are given as error in the measurement of the sourcepos
+            show: true by default. Indicates whether the plot is to be shown at the end of the func
+            save: by default false. Indicates whether the plot is to be saved in the current directory
+            title: title that will be used to save the file if save = True
+            additional: The coordinates for an additional point to be plotted
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+
+        #Defines the properties of the circle  representing the source
+        source = plt.Circle( (sourcepos[0], sourcepos[1]), radius = 1)
+        source.set_color('g')
+        source.set_alpha(0.5)
+        source.set_edgecolor('k')
+
+        if(len(additional) != 0):
+            other= plt.Circle( (additional[0], additional[1]), radius = 0.01)
+            source.set_color('b')
+            source.set_alpha(0.5)
+            source.set_edgecolor('k')
+
+        ax.add_patch(source)
+
+        for mic in micarray:
+            pos = mic.get_position()
+            dot = plt.Cirlce(( pos[0], pos[1])), radius = 0.01)
+            dot.set_color('k')
+
+
+        ax.autoscale_view()
+        ax.figure.canvas.draw()
+
+        if(save):
+            plt.savefig(title, dpi = 300)
+        if(show):
+            plt.show()
+
+
+
+
+
+
+
 class Microphone:
 	def __init__(self, location=[0.0, 0.0, 0.0], channel=1, wave=null):
 		self.position = position
 		self.channel = channel
+        #Remember that the next line of code needs to be changed in the future
 		self.wave=dsp.read_wave(filename=filename, channel = self.channel)
 
-	def setwave(filename='sound.wav'):
+    #Remember that this needs to be changed in the future
+	def set_wave(filename='sound.wav'):
 		wave = dsp.read_wave(filename=filename, channel = self.channel)
 
+
+    #Remember that this needs to be changed in the future
 	def apply_filter(pass_band = []):
 		'''
 		assumed always using the band_pass filter
 		'''
 		self.wave.band_pass(range = pass_band)
+
+    def get_position():
+        return self.position
+
+    def get_channel():
+        return self.channel
+
+    def get_wave():
+        return self.wave
+
+
+
+
 
 class Emitter:
 	def __init__(self, location=[0.0, 0.0, 0.0], filename ='sound.wav', noiselevel=0, tentry=0, texit=0):
@@ -151,4 +238,3 @@ class Emitter:
 
 		#add noise
         signal.ys = signal.ys + np.random.normal(scale = noise_level, size = len(signal.ys))
-
