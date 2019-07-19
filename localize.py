@@ -116,4 +116,3 @@ class SensorArray:
                 variables in the microphone objects and applies the filtering.
             Assumes: filename is a string in wav format and uses the specified passband
         """
-
