@@ -116,13 +116,4 @@ class SensorArray:
                 variables in the microphone objects and applies the filtering.
             Assumes: filename is a string in wav format and uses the specified passband
         """
-        self.file = filename
-        for mic in micarray:
-            mic.
 
-    def filter_all():
-        """Applies a band pass filter to all of the microphones in the list"""
-
-
-
-    def plot():
