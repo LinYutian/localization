@@ -32,8 +32,7 @@ def sdoa(wave1, wave2,pass_band = []):
     """
     Returns :
         the number of samples of difference as calculated with the algorithm. If x is the result then this means
-        that one needs to shift wave 2 by x samples (positive means to the right, negative to the left) so that one obtains the maximum
-        correlation. Hilbert transform is used
+        that wave 1 arrived before by x samples (negative means it arrived later)
     Assumes:
         Wave1 and Wave2 are wave objects with same number of samples
         pass_band is the pass_band used for the filter. If nothing is passed the signals are not filtered.
@@ -54,12 +53,12 @@ def sdoa(wave1, wave2,pass_band = []):
     segment1 = h1.segment(start = start, duration = duration)
     segment2 = h2.segment(start = start, duration = duration)
 
-    return correlate(h1,h2)
+    return (-1 )* correlate(h1,h2)
 
 def tdoa(wave1, wave2,speed = 1500, pass_band):
     """
     A simple wrapper for sdoa that changes units to seconds. Used only as a matter of
-    convinicience
+    convinicience. If x is the result this means that wave1 arrived x seconds before wave2
     """
     samples = sdoa(wave1, wave2, pass_band)
     return (samples/wave1.framerate)*speed
