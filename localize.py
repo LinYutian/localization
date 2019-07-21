@@ -94,6 +94,10 @@ def hplot(wave1, wave2, pass_band = []):
 
     plt.show()
 
+def 
+
+
+
 
 #The following section conatins the definition of the classes to be used.
 
