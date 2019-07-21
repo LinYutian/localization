@@ -4,6 +4,10 @@ import numpy as np
 import scipy.signal as sig
 
 
+
+#The Following section contains definition of Helper functions
+#to be used to write the code
+
 def Hilbert(signal):
     padding = np.zeros(int(2 ** np.ceil(np.log2(len(signal)))) - len(signal))
     tohilbert = np.hstack((signal, padding))
@@ -56,7 +60,7 @@ def sdoa(wave1, wave2,pass_band = []):
 
     return correlate(h1,h2)
 
-def tdoa(wave1, wave2,speed = 1500, pass_band):
+def tdoa(wave1, wave2,speed = 1500, pass_band = [1900,2100]):
     """
     A simple wrapper for sdoa that changes units to seconds. Used only as a matter of
     convinicience
@@ -92,13 +96,15 @@ def hplot(wave1, wave2, pass_band = []):
     plt.show()
 
 
+#The following section conatins the definition of the classes to be used.
+
 class SensorArray:
     """Object to represent and Array of Sensors
     Provides the functuonality to localize
     """
     def __init__(self, mic_array, pass_band, soundfile = ""):
         """Assumes: mic_array is a list of microphone objects
-                    pos_source indicates the initial position of source and isinitialized to (0,0,0)
+                    pos_source indicates the initial position of source and is initialized to (0,0,0)
                     by default
                     pass_band is a list of two elements indicating lower and
                     upper bounds"""
@@ -112,20 +118,20 @@ class SensorArray:
         if(self.file != ""):
             self.set_file(soundfile)
 
-    def get_micarray():
+    def get_micarray( self ):
         return  self.mic_array
 
-    def get_passband():
-        return get_pass_band
+    def get_passband( self ):
+        return self.passband
 
-    def get_sourcepos():
+    def get_sourcepos( self ):
         return self.sourcepos.tolist()
 
-    def get_file():
+    def get_file( self ):
         "Returns the name of the file with which "
         return self.file
 
-    def set_file(filename):
+    def set_file(self, filename):
         """Sets the name of the file to analyze and initializes the wave instance
                 variables in the microphone objects and applies the filtering.
             Assumes: filename is a string in wav format and uses the specified passband
@@ -135,13 +141,17 @@ class SensorArray:
             mic.set_wave(self.file)
         self.apply_filter()
 
-    def apply_filter():
+    def set_sourcepos(self, pos):
+        """Sets the position of the source manually"""
+        self.sourcepos = pos
+
+    def apply_filter(self):
         """Applies the the band_pass filter with the set pass_band to
             each of the microphones"""
         for mic in micarray:
             mic.apply_filter(range = range)
 
-    def plot(error = 2, show = True, save = False, additional = [],  title = "plot.png"):
+    def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
         Plots the current position of the microphones and the estimated position of the source
         Assumes:
@@ -151,90 +161,116 @@ class SensorArray:
             title: title that will be used to save the file if save = True
             additional: The coordinates for an additional point to be plotted
         """
+        #A list of Artists to put in the legend
+        art = []
+        labels = []
+
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
 
-        #Defines the properties of the circle  representing the source
-        source = plt.Circle( (sourcepos[0], sourcepos[1]), radius = 1)
+        #Defines the properties of the circle  representing the source both the error
+        #and the actual predicted location
+        source_error = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = 1)
+        source_error.set_color('g')
+        source_error.set_alpha(0.3)
+        source_error.set_edgecolor('k')
+        ax.add_patch(source_error)
+        art.append(source_error)
+        labels.append("Source error")
+
+        source = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = 0.01)
         source.set_color('g')
-        source.set_alpha(0.5)
-        source.set_edgecolor('k')
+        ax.add_patch(source)
+        art.append(source)
+        labels.append("Source")
+
 
         if(len(additional) != 0):
             other= plt.Circle( (additional[0], additional[1]), radius = 0.01)
-            source.set_color('b')
-            source.set_alpha(0.5)
-            source.set_edgecolor('k')
+            other.set_color('b')
+            ax.add_patch(other)
+            art.append(other)
+            labels.append("Real location")
+
 
         ax.add_patch(source)
 
-        for mic in micarray:
+        for mic in self.micarray:
             pos = mic.get_position()
-            dot = plt.Cirlce(( pos[0], pos[1])), radius = 0.01)
-            dot.set_color('k')
+            dot = plt.Circle(( pos[0], pos[1]), radius = 0.01)
+            dot.set_color( 'k' )
+            ax.add_patch( dot )
+
+        if(len(self.micarray) != 0):
+            art.append(dot)
+            labels.append("Hydrophones")
 
 
+        #Make the graph pretty
         ax.autoscale_view()
-        ax.figure.canvas.draw()
+        ax.legend(tuple(art), tuple(labels), loc = 'best', fontsize = 'x-small')
+        plt.axis('equal')
+        plt.xlabel("meters")
+        plt.ylabel("meters")
+
 
         if(save):
-            plt.savefig(title, dpi = 300)
+            plt.savefig(title, dpi = 350)
         if(show):
             plt.show()
 
 
-
-
-
-
-
 class Microphone:
-	def __init__(self, location=[0.0, 0.0, 0.0], channel=1, wave=null):
-		self.position = position
-		self.channel = channel
+    def __init__(self, position=[0.0, 0.0, 0.0], channel=1, filename = ""):
+        self.position = position
+        self.channel = channel
         #Remember that the next line of code needs to be changed in the future
-		self.wave=dsp.read_wave(filename=filename, channel = self.channel)
+        if(len(filename) == 0):
+            self.wave = None
+        else:
+            self.wave=dsp.read_wave(filename=filename, channel = self.channel)
 
     #Remember that this needs to be changed in the future
-	def set_wave(filename='sound.wav'):
-		wave = dsp.read_wave(filename=filename, channel = self.channel)
+    def read_wave(self, filename='sound.wav'):
+    	self.wave = dsp.read_wave(filename=filename, channel = self.channel)
+
+    def set_wave(self, wave):
+        """sets a wave directly"""
+        self.wave =  wave
 
 
     #Remember that this needs to be changed in the future
-	def apply_filter(pass_band = []):
-		'''
-		assumed always using the band_pass filter
-		'''
-		self.wave.band_pass(range = pass_band)
+    def apply_filter(self, pass_band = []):
+    	'''
+    	assumed always using the band_pass filter
+    	'''
+    	self.wave.band_pass(range = pass_band)
 
-    def get_position():
+    def get_position( self ):
         return self.position
 
-    def get_channel():
+    def get_channel( self ):
         return self.channel
 
-    def get_wave():
+    def get_wave( self ):
         return self.wave
 
 
-
-
-
 class Emitter:
-	def __init__(self, location=[0.0, 0.0, 0.0], filename ='sound.wav', noiselevel=0, tentry=0, texit=0):
-		self.location = location
-		self.filename = filename
-		self.noiselevel = noiselevel
-		self.tentry =tentry
-		self.texit = texit
+    def __init__(self, location=[0.0, 0.0, 0.0], filename ='sound.wav', noiselevel=0, tentry=0, texit=0):
+    	self.location = location
+    	self.filename = filename
+    	self.noiselevel = noiselevel
+    	self.tentry =tentry
+    	self.texit = texit
 
-	def new_file(filename='sound.wav'):
-		signal = dsp.read_wave(filename = filename)
+    def new_file(self, filename='sound.wav'):
+    	signal = dsp.read_wave(filename = filename)
 
-		#padding entry and exit time
-		pad_front = np.zeros(signal.framerate * tentry)
-		pad_back = np.zeros(signal.framerate * texit)
-		np.concatenate([pad_front, signal, pad_back])
+    	#padding entry and exit time
+    	pad_front = np.zeros(signal.framerate * tentry)
+    	pad_back = np.zeros(signal.framerate * texit)
+    	np.concatenate([pad_front, signal, pad_back])
 
-		#add noise
-        signal.ys = signal.ys + np.random.normal(scale = noise_level, size = len(signal.ys))
+    	#add noise
+        #signal.ys = signal.ys + np.random.normal(scale = noise_level, size = len(signal.ys))
