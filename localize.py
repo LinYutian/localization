@@ -81,6 +81,10 @@ def hplot(wave1, wave2, pass_band = []):
 
     plt.show()
 
+def 
+
+
+
 
 class Microphone:
 	def __init__(self, location=[0.0, 0.0, 0.0], channel=1, wave=null):
