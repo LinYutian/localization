@@ -93,7 +93,7 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
-
+    
 #The following section conatins the definition of the classes to be used.
 
 class SensorArray:
@@ -174,11 +174,6 @@ class SensorArray:
         solution = np.matmul(matmul(inv(np.matmul(mat_a.transpose(),mat_a)),mat_a.transpose()),mat_b)
 
         sourcepos = solution[:len(solution)-1] 
-
-
-
-
-
 
     def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
