@@ -1,7 +1,13 @@
-import myThinkdsp as dsp
+import thinkdsp as dsp
 import matplotlib.pyplot as plt
 import numpy as np
+import wavio
 import scipy.signal as sig
+import copy
+import scipy.spatial.distace as dist
+
+sound_speed = 1500
+
 
 
 def Hilbert(signal):
@@ -95,21 +101,17 @@ class SensorArray:
     """Object to represent and Array of Sensors
     Provides the functuonality to localize
     """
-    def __init__(self, mic_array, pass_band, soundfile = ""):
-        """Assumes: mic_array is a list of microphone objects
-                    pos_source indicates the initial position of source and isinitialized to (0,0,0)
-                    by default
-                    pass_band is a list of two elements indicating lower and
-                    upper bounds"""
-
+    def __init__(self, mic_array):
+        """
+        Assumes: mic_array is a list of microphone objects
+                pos_source indicates the initial position of source and isinitialized to (0,0,0)
+                by default
+                soundfile is string indicating a file on the same folder. If an argument is passed
+                then the constructor immidiately reads the soundfile in each of the arrays.
+        """
         self.micarray = mic_array
-        self.passband = pass_band
         self.sourcepos = [0, 0, 0]
-        self.file = soundfile
 
-        #Immidiately applies the filter to the microphoness
-        if(self.file != ""):
-            self.set_file(soundfile)
 
     def get_micarray():
         return  self.mic_array
@@ -119,20 +121,18 @@ class SensorArray:
 
     def get_sourcepos():
         return self.sourcepos.tolist()
+    def get_mic_number():
+        """Returns the number of microphones in the array"""
+        return len(self.micarray)
 
-    def get_file():
-        "Returns the name of the file with which "
-        return self.file
 
     def set_file(filename):
         """Sets the name of the file to analyze and initializes the wave instance
-                variables in the microphone objects and applies the filtering.
+                variables in the microphone objects.
             Assumes: filename is a string in wav format and uses the specified passband
         """
-        self.file = filename
         for mic in self.micarray:
-            mic.set_wave(self.file)
-        self.apply_filter()
+            mic.set_wave( filename )
 
     def apply_filter():
         """Applies the the band_pass filter with the set pass_band to
@@ -145,7 +145,7 @@ class SensorArray:
         Plots the current position of the microphones and the estimated position of the source
         Assumes:
             error: Number of meters that are given as error in the measurement of the sourcepos
-            show: true by default. Indicates whether the plot is to be shown at the end of the func
+            show: true by default. Indicates whether the plot is to be shown at the end of the function
             save: by default false. Indicates whether the plot is to be saved in the current directory
             title: title that will be used to save the file if save = True
             additional: The coordinates for an additional point to be plotted
@@ -185,27 +185,41 @@ class SensorArray:
 
 
 
-
-
 class Microphone:
-	def __init__(self, location=[0.0, 0.0, 0.0], channel=1, wave=null):
-		self.position = position
+	def __init__(self, position=[0.0, 0.0, 0.0], channel=1):
+		self.position = np.array(position)
 		self.channel = channel
-        #Remember that the next line of code needs to be changed in the future
-		self.wave=dsp.read_wave(filename=filename, channel = self.channel)
-
-    #Remember that this needs to be changed in the future
-	def set_wave(filename='sound.wav'):
-		wave = dsp.read_wave(filename=filename, channel = self.channel)
+		self.wave= None
 
 
-    #Remember that this needs to be changed in the future
-	def apply_filter(pass_band = []):
-		'''
-		assumed always using the band_pass filter
-		'''
-		self.wave.band_pass(range = pass_band)
+	def read_wave(filename='sound.wav'):
+        """
+        Reads a file and creates a wave objec that is then assigned to the instance variable abs
+        representing the wave
+        """
 
+        wavob = wavio.read(filename)
+        nchannel = len(wavob.data[0])
+        sampw = wavob.sampwidth
+        data = wavob.data
+        framerate = wavob.rate
+
+        ys = data[:,0]
+
+        if(nchannel >= 2):
+            ys = data[:,self.channel -1]
+
+        #ts = np.arange(len(ys)) / framerate
+        wav = dsp.Wave(ys, framerate=framerate)
+        wav.normalize()
+        self.wave = wav
+
+    def set_wave(wave):
+        """
+        Sets the wave instance variable to the wave object created
+        Assumes:
+            wave is a Wave object from the thinkdsp module
+        """
     def get_position():
         return self.position
 
@@ -215,25 +229,99 @@ class Microphone:
     def get_wave():
         return self.wave
 
+    def butter_bandpass(self, lowcut, highcut, fs, order=5):
+        nyq = 0.5 * fs
+        low = lowcut / nyq
+        high = highcut / nyq
+        sos= sig.butter(order, [low, high], btype='band', output ='sos')
+        return sos
+
+    def butter_bandpass_filter(self, data, lowcut, highcut, fs, order=5):
+        sos = self.butter_bandpass(lowcut, highcut, fs, order=order)
+        y = sig.sosfiltfilt(sos, data, axis=-1, padtype='odd', padlen=None)
+        return y
+
+
+    def apply_filter(self, range):
+		'''
+		assumed always using the band_pass filter
+		'''
+        y = self.wave.ys
+        self.wave.ys = self.butter_bandpass_filter(data = y, lowcut = range[0], highcut = range[1],fs = self.framerate, order = 5)
+
 
 
 
 
 class Emitter:
-	def __init__(self, location=[0.0, 0.0, 0.0], filename ='sound.wav', noiselevel=0, tentry=0, texit=0):
-		self.location = location
-		self.filename = filename
+	def __init__(self, location= [0.0, 0.0, 0.0], noiselevel=0, tentry=0, texit=0):
+        """
+        Object that simulates an emmitter of sound through a channel.
+
+        """
+
+        #Wave object from class thinkdsp that represents the original signal before
+        #it is transmitted to the channels
+        self.signal =None
+
+		self.location = np.array(location)
 		self.noiselevel = noiselevel
 		self.tentry =tentry
 		self.texit = texit
 
-	def new_file(filename='sound.wav'):
-		signal = dsp.read_wave(filename = filename)
+
+	def read_file(filename='sound.wav'):
+        """
+        Reads a file with the original signal and sets the instance variable
+        to the array
+        Assumes:
+            filename is a string and the file it denotes contains only one channel
+
+        """
+		self.signal = dsp.read_wave(filename = filename)
+        self.apply_padding()
+
+    def set_wave( wave ):
+        """
+        Sets the wave with the neccesary padding at the front and at the back
+        that was established by the file
+        """
+        self.signal = wave
+        self.apply_padding()
+
+    def apply_padding():
+        """
+        Adds the neccesary padding to the signal instance variable.
+        The variable used for the padding is that of the object when it is
+        instantiated.
+        """
+        temp = self.signal.ys
 
 		#padding entry and exit time
 		pad_front = np.zeros(signal.framerate * tentry)
 		pad_back = np.zeros(signal.framerate * texit)
-		np.concatenate([pad_front, signal, pad_back])
+		temp = np.concatenate((np.concatenate((pad_front, temp)), pad_back))
 
-		#add noise
-        signal.ys = signal.ys + np.random.normal(scale = noise_level, size = len(signal.ys))
+        self.signal = dsp.Wave(temp, framerate= self.signal.framerate)
+
+
+    def emit(sensor):
+        """
+        The function directly alters the state of the sensor array by passing
+        wave objects to the microphones corresponding to what they would observe
+        if this were the real world.
+        Assumes:
+            sensor is a SensorArray object with the given parameters
+        """
+
+        final_waves = []
+        for i in np.arange(sensor.get_mic_number()):
+            final_waves.append(copy.deepcopy(self.signal))
+
+        for i in np.arange(sensor.get_mic_number()):
+            mic = sensor.mic_array[i]
+            d = dist.euclidian(self.location, mic.get_position())
+            dt = d/sound_speed
+            ds = np.floor(dt * self.signal.framerate)
+            final_waves[i].roll(ds)
+            final_waves[i].ys =  final_waves[i].ys + np.random.normal(scale = noise_level, size = len(signal.ys))
