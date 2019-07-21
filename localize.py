@@ -93,12 +93,7 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
-
-def 
-
-
-
-
+    
 #The following section conatins the definition of the classes to be used.
 
 class SensorArray:
@@ -153,6 +148,32 @@ class SensorArray:
             each of the microphones"""
         for mic in micarray:
             mic.apply_filter(range = range)
+
+    def getemitter(self):
+        set_file(filename=self.file)
+        '''
+        the algorithm to trileterate is taken from stack exchange
+        @https://math.stackexchange.com/questions/1722021/trilateration-using-tdoa
+        '''
+        mat_a = []
+        mat_b = []
+        #assumed anchor hydrophone always the first one in the array
+        anchor = get_position(self.micarray[0])
+        for mic in self.micarray:
+            pos=mic.get_position
+            mat_a.append([anchor[0]-pos[0],
+                        anchor[1]-pos[1],
+                        scipy.spatial.distance.euclidean(anchor, pos)])
+            mat_b.append([(anchor[0]**2-pos[0]**2)/2,
+                        (anchor[1]**2-pos[1]**2)/2,
+                        (scipy.spatial.distance.euclidean(anchor, pos)**2)/2])
+        mat_a.pop(0)
+        mat_b.pop(0)
+        np.array(mat_a)
+        np.array(mat_b)
+        solution = np.matmul(matmul(inv(np.matmul(mat_a.transpose(),mat_a)),mat_a.transpose()),mat_b)
+
+        sourcepos = solution[:len(solution)-1] 
 
     def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
