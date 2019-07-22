@@ -14,6 +14,61 @@ sound_speed = 1500
 #The Following section contains definition of Helper functions
 #to be used to write the code
 
+def create_random_bursts(sfs = 2000, fs = 96000, intervals = 8):
+    """
+    Assumes:
+        sfs frequency of the carrier wave
+        fs sampling frequency
+        intervals number of random bursts to be created
+    Returns:
+        Wave object consisting of beeps with random amplitude
+    """
+
+    dt = 1/fs
+    final = np.array([])
+
+    for i in range(intervals):
+        amp = 1
+        wait = np.random.uniform(0.5,2)
+        stime = np.random.uniform(0.02,0.1)
+        t = np.arange(0,stime,dt)
+
+        zeros = np.zeros(int(np.floor(fs*wait)))
+        signal = amp*np.sin(t*np.pi*(1/stime))*np.sin(2*np.pi*t*sfs)
+        final = np.concatenate((final,zeros))
+        final = np.concatenate((final,signal))
+        final = np.concatenate((final,zeros))
+    final = np.concatenate((final, np.zeros(fs*2)))
+    return dsp.Wave(final, framerate = fs)
+
+def create_uniform_noise_burst(ntime = 0.1, stime = 0.5,fs = 96000, intervals = 20):
+    """
+    Assumes:
+        ntime is the time of the noise
+        stime is the of silence between bursts
+        fs is the sampling frequency
+        intervals is the number of noise bursts
+    Returns:
+        Wave object of noise bursts taken from a uniform distribution U~[0,1]
+        with an "intervals" number and with an "ntime" time of sound spaced by "stime"
+        seconds
+    """
+    ft = 1/fs
+    final = np.array([])
+
+    for i in range(intervals):
+        noise = np.random.uniform(size = int(np.floor(fs*ntime)))
+        silence = np.zeros(int(np.floor(fs*stime)))
+        final = np.concatenate((final,silence))
+        final = np.concatenate((final, noise))
+
+
+    final = np.concatenate((final, silence))
+
+    return final
+
+
+
 def Hilbert(signal):
     padding = np.zeros(int(2 ** np.ceil(np.log2(len(signal)))) - len(signal))
     tohilbert = np.hstack((signal, padding))
@@ -99,7 +154,7 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
-    
+
 #The following section conatins the definition of the classes to be used.
 
 class SensorArray:
@@ -174,7 +229,7 @@ class SensorArray:
         np.array(mat_b)
         solution = np.matmul(matmul(inv(np.matmul(mat_a.transpose(),mat_a)),mat_a.transpose()),mat_b)
 
-        sourcepos = solution[:len(solution)-1] 
+        sourcepos = solution[:len(solution)-1]
 
     def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
