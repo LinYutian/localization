@@ -10,6 +10,10 @@ sound_speed = 1500
 
 
 
+
+#The Following section contains definition of Helper functions
+#to be used to write the code
+
 def Hilbert(signal):
     padding = np.zeros(int(2 ** np.ceil(np.log2(len(signal)))) - len(signal))
     tohilbert = np.hstack((signal, padding))
@@ -61,7 +65,7 @@ def sdoa(wave1, wave2,pass_band = []):
 
     return (-1 )* correlate(h1,h2)
 
-def tdoa(wave1, wave2,speed = 1500, pass_band):
+def tdoa(wave1, wave2,speed = 1500, pass_band = [1900,2100]):
     """
     A simple wrapper for sdoa that changes units to seconds. Used only as a matter of
     convinicience. If x is the result this means that wave1 arrived x seconds before wave2
@@ -95,12 +99,14 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
-
+    
+#The following section conatins the definition of the classes to be used.
 
 class SensorArray:
     """Object to represent and Array of Sensors
     Provides the functuonality to localize
     """
+
     def __init__(self, mic_array):
         """
         Assumes: mic_array is a list of microphone objects
@@ -109,24 +115,24 @@ class SensorArray:
                 soundfile is string indicating a file on the same folder. If an argument is passed
                 then the constructor immidiately reads the soundfile in each of the arrays.
         """
+
         self.micarray = mic_array
-        self.sourcepos = [0, 0, 0]
+        self.sourcepos = np.array([0, 0, 0])
 
 
-    def get_micarray():
+    def get_micarray( self ):
         return  self.mic_array
 
-    def get_passband():
-        return get_pass_band
+    def get_passband( self ):
+        return self.passband
 
-    def get_sourcepos():
+    def get_sourcepos( self ):
         return self.sourcepos.tolist()
     def get_mic_number():
         """Returns the number of microphones in the array"""
         return len(self.micarray)
 
-
-    def set_file(filename):
+    def set_file(self, filename):
         """Sets the name of the file to analyze and initializes the wave instance
                 variables in the microphone objects.
             Assumes: filename is a string in wav format and uses the specified passband
@@ -134,13 +140,43 @@ class SensorArray:
         for mic in self.micarray:
             mic.set_wave( filename )
 
-    def apply_filter():
+    def set_sourcepos(self, pos):
+        """Sets the position of the source manually"""
+        self.sourcepos = pos
+
+    def apply_filter(self):
         """Applies the the band_pass filter with the set pass_band to
             each of the microphones"""
         for mic in micarray:
             mic.apply_filter(range = range)
 
-    def plot(error = 2, show = True, save = False, additional = [],  title = "plot.png"):
+    def getemitter(self):
+        set_file(filename=self.file)
+        '''
+        the algorithm to trileterate is taken from stack exchange
+        @https://math.stackexchange.com/questions/1722021/trilateration-using-tdoa
+        '''
+        mat_a = []
+        mat_b = []
+        #assumed anchor hydrophone always the first one in the array
+        anchor = get_position(self.micarray[0])
+        for mic in self.micarray:
+            pos=mic.get_position
+            mat_a.append([anchor[0]-pos[0],
+                        anchor[1]-pos[1],
+                        scipy.spatial.distance.euclidean(anchor, pos)])
+            mat_b.append([(anchor[0]**2-pos[0]**2)/2,
+                        (anchor[1]**2-pos[1]**2)/2,
+                        (scipy.spatial.distance.euclidean(anchor, pos)**2)/2])
+        mat_a.pop(0)
+        mat_b.pop(0)
+        np.array(mat_a)
+        np.array(mat_b)
+        solution = np.matmul(matmul(inv(np.matmul(mat_a.transpose(),mat_a)),mat_a.transpose()),mat_b)
+
+        sourcepos = solution[:len(solution)-1] 
+
+    def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
         Plots the current position of the microphones and the estimated position of the source
         Assumes:
@@ -150,36 +186,64 @@ class SensorArray:
             title: title that will be used to save the file if save = True
             additional: The coordinates for an additional point to be plotted
         """
+        #A list of Artists to put in the legend
+        art = []
+        labels = []
+
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
 
-        #Defines the properties of the circle  representing the source
-        source = plt.Circle( (sourcepos[0], sourcepos[1]), radius = 1)
+        #Defines the properties of the circle  representing the source both the error
+        #and the actual predicted location
+        source_error = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = 1)
+        source_error.set_color('g')
+        source_error.set_alpha(0.3)
+        source_error.set_edgecolor('k')
+        ax.add_patch(source_error)
+        art.append(source_error)
+        labels.append("Source error")
+
+        source = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = 0.01)
         source.set_color('g')
-        source.set_alpha(0.5)
-        source.set_edgecolor('k')
+        ax.add_patch(source)
+        art.append(source)
+        labels.append("Source")
+
 
         if(len(additional) != 0):
             other= plt.Circle( (additional[0], additional[1]), radius = 0.01)
-            source.set_color('b')
-            source.set_alpha(0.5)
-            source.set_edgecolor('k')
+            other.set_color('b')
+            ax.add_patch(other)
+            art.append(other)
+            labels.append("Real location")
+
 
         ax.add_patch(source)
 
-        for mic in micarray:
+        for mic in self.micarray:
             pos = mic.get_position()
-            dot = plt.Cirlce(( pos[0], pos[1])), radius = 0.01)
-            dot.set_color('k')
+            dot = plt.Circle(( pos[0], pos[1]), radius = 0.01)
+            dot.set_color( 'k' )
+            ax.add_patch( dot )
+
+        if(len(self.micarray) != 0):
+            art.append(dot)
+            labels.append("Hydrophones")
 
 
+        #Make the graph pretty
         ax.autoscale_view()
-        ax.figure.canvas.draw()
+        ax.legend(tuple(art), tuple(labels), loc = 'best', fontsize = 'x-small')
+        plt.axis('equal')
+        plt.xlabel("meters")
+        plt.ylabel("meters")
+
 
         if(save):
-            plt.savefig(title, dpi = 300)
+            plt.savefig(title, dpi = 350)
         if(show):
             plt.show()
+
 
 
 
@@ -192,12 +256,16 @@ class Microphone:
 		self.wave= None
 
 
+    def set_wave(self, wave):
+        """sets a wave directly"""
+        self.wave =  wave
+
+
 	def read_wave(filename='sound.wav'):
         """
         Reads a file and creates a wave objec that is then assigned to the instance variable abs
         representing the wave
         """
-
         wavob = wavio.read(filename)
         nchannel = len(wavob.data[0])
         sampw = wavob.sampwidth
@@ -214,19 +282,13 @@ class Microphone:
         wav.normalize()
         self.wave = wav
 
-    def set_wave(wave):
-        """
-        Sets the wave instance variable to the wave object created
-        Assumes:
-            wave is a Wave object from the thinkdsp module
-        """
     def get_position():
         return self.position
 
-    def get_channel():
+    def get_channel( self ):
         return self.channel
 
-    def get_wave():
+    def get_wave( self ):
         return self.wave
 
     def butter_bandpass(self, lowcut, highcut, fs, order=5):
@@ -243,14 +305,11 @@ class Microphone:
 
 
     def apply_filter(self, range):
-		'''
-		assumed always using the band_pass filter
-		'''
+      '''
+      assumed always using the band_pass filter
+      '''
         y = self.wave.ys
         self.wave.ys = self.butter_bandpass_filter(data = y, lowcut = range[0], highcut = range[1],fs = self.framerate, order = 5)
-
-
-
 
 
 class Emitter:
