@@ -4,15 +4,87 @@ import numpy as np
 import wavio
 import scipy.signal as sig
 import copy
-import scipy.spatial.distace as dist
+import scipy.spatial.distance as dist
 
 sound_speed = 1500
 
-
-
-
 #The Following section contains definition of Helper functions
 #to be used to write the code
+
+def make_randombursts(sfs = 2000, fs = 96000, intervals = 8):
+    """
+    Assumes:
+        sfs frequency of the carrier wave
+        fs sampling frequency
+        intervals number of random bursts to be created
+    Returns:
+        Wave object consisting of beeps with random amplitude
+    """
+
+    dt = 1/fs
+    final = np.array([])
+
+    for i in range(intervals):
+        amp = 1
+        wait = np.random.uniform(0.5,2)
+        stime = np.random.uniform(0.02,0.1)
+        t = np.arange(0,stime,dt)
+
+        zeros = np.zeros(int(np.floor(fs*wait)))
+        signal = amp*np.sin(t*np.pi*(1/stime))*np.sin(2*np.pi*t*sfs)
+        final = np.concatenate((final,zeros))
+        final = np.concatenate((final,signal))
+        final = np.concatenate((final,zeros))
+    final = np.concatenate((final, np.zeros(fs*2)))
+    return dsp.Wave(final, framerate = fs)
+
+def make_noiseburst(ntime = 0.1, stime = 0.5,fs = 96000, intervals = 20):
+    """
+    Assumes:
+        ntime is the time of the noise
+        stime is the of silence between bursts
+        fs is the sampling frequency
+        intervals is the number of noise bursts
+    Returns:
+        Wave object of noise bursts taken from a uniform distribution U~[0,1]
+        with an "intervals" number and with an "ntime" time of sound spaced by "stime"
+        seconds
+    """
+    ft = 1/fs
+    final = np.array([])
+
+    for i in range(intervals):
+        noise = np.random.uniform(size = int(np.floor(fs*ntime)))
+        silence = np.zeros(int(np.floor(fs*stime)))
+        final = np.concatenate((final,silence))
+        final = np.concatenate((final, noise))
+
+
+    final = np.concatenate((final, silence))
+
+    return final
+
+
+def make_gausspulse(sfs ,iterations,fs):
+    """Creates a wave object consisting of "iterations" number of gaussian modualted
+    pulses with a carrier frequency of fs and a sampling rate of fs.
+    """
+    dt = 1/fs
+    t = np.arange(-1,1,dt)
+
+    sigma = 0.25**2
+
+    y = np.exp(-1 * t**2/sigma**2)*np.sin(2*np.pi*sfs*t)
+
+    final = y
+
+    for i in range(iterations):
+        final = np.concatenate((final,y))
+
+    wave = dsp.Wave(final, framerate= framerate)
+    return wave
+
+
 
 def Hilbert(signal):
     padding = np.zeros(int(2 ** np.ceil(np.log2(len(signal)))) - len(signal))
@@ -38,7 +110,7 @@ def correlate(wave1, wave2):
     return max
 
 
-def sdoa(wave1, wave2,pass_band = []):
+def sdoa(wave1, wave2):
     """
     Returns :
         the number of samples of difference as calculated with the algorithm. If x is the result then this means
@@ -47,10 +119,6 @@ def sdoa(wave1, wave2,pass_band = []):
         Wave1 and Wave2 are wave objects with same number of samples
         pass_band is the pass_band used for the filter. If nothing is passed the signals are not filtered.
     """
-    if (len(pass_band) != 0):
-        wave1.band_pass(pass_band)
-        wave2.band_pass(pass_band)
-
 
     #creates the wave objects with the new signals
     h1 = dsp.Wave(np.abs(Hilbert(wave1.ys)), framerate = wave1.framerate)
@@ -65,29 +133,30 @@ def sdoa(wave1, wave2,pass_band = []):
 
     return (-1 )* correlate(h1,h2)
 
-def tdoa(wave1, wave2,speed = 1500, pass_band = [1900,2100]):
+def tdoa(wave1, wave2):
     """
     A simple wrapper for sdoa that changes units to seconds. Used only as a matter of
-    convinicience. If x is the result this means that wave1 arrived x seconds before wave2
+    convinicience. If x is the result this means that wave1 arrived x seconds before wave2. That is,
+    if t_o is arrival of wave 1 and and t_2 is arrival of wave 2. t = t_2 - t_o
     """
-    samples = sdoa(wave1, wave2, pass_band)
-    return (samples/wave1.framerate)*speed
+    samples = sdoa(wave1, wave2)
+    solution = (samples/wave1.framerate)
+
+    return solution
 
 
 
-def hplot(wave1, wave2, pass_band = []):
+def hplot(wave1, wave2):
     """
     Assummes
         wave1 and wave2 are wave objects
-        pass_band is the pass_band to pass on to the filter. If empty no filter is applied
     Returns
         Plot of wave1 and wave2 with respective envelopes obtained with hilbert Transforms
         wave1 is in blue wave2 is in red. Envelope 1 is in black envelope 2 is in cyan
     """
 
-    if(len(pass_band) != 0):
-        wave1.band_pass(range = pass_band)
-        wave2.band_pass(range = pass_band)
+    #Remember to modify
+
 
     h1 = dsp.Wave(np.abs(Hilbert(wave1.ys)), framerate = wave1.framerate)
     h2 = dsp.Wave(np.abs(Hilbert(wave2.ys)), framerate = wave2.framerate)
@@ -99,7 +168,7 @@ def hplot(wave1, wave2, pass_band = []):
     plt.plot(h2.ts, h2.ys, color = 'c')
 
     plt.show()
-    
+
 #The following section conatins the definition of the classes to be used.
 
 class SensorArray:
@@ -128,7 +197,7 @@ class SensorArray:
 
     def get_sourcepos( self ):
         return self.sourcepos.tolist()
-    def get_mic_number():
+    def get_mic_number( self ):
         """Returns the number of microphones in the array"""
         return len(self.micarray)
 
@@ -144,14 +213,13 @@ class SensorArray:
         """Sets the position of the source manually"""
         self.sourcepos = pos
 
-    def apply_filter(self):
+    def apply_filter(self, range):
         """Applies the the band_pass filter with the set pass_band to
             each of the microphones"""
-        for mic in micarray:
+        for mic in self.micarray:
             mic.apply_filter(range = range)
 
     def getemitter(self):
-        set_file(filename=self.file)
         '''
         the algorithm to trileterate is taken from stack exchange
         @https://math.stackexchange.com/questions/1722021/trilateration-using-tdoa
@@ -159,22 +227,28 @@ class SensorArray:
         mat_a = []
         mat_b = []
         #assumed anchor hydrophone always the first one in the array
-        anchor = get_position(self.micarray[0])
-        for mic in self.micarray:
-            pos=mic.get_position
-            mat_a.append([anchor[0]-pos[0],
-                        anchor[1]-pos[1],
-                        scipy.spatial.distance.euclidean(anchor, pos)])
-            mat_b.append([(anchor[0]**2-pos[0]**2)/2,
-                        (anchor[1]**2-pos[1]**2)/2,
-                        (scipy.spatial.distance.euclidean(anchor, pos)**2)/2])
-        mat_a.pop(0)
-        mat_b.pop(0)
-        np.array(mat_a)
-        np.array(mat_b)
-        solution = np.matmul(matmul(inv(np.matmul(mat_a.transpose(),mat_a)),mat_a.transpose()),mat_b)
+        reference = self.micarray[0]
+        reference_pos = reference.get_position()
 
-        sourcepos = solution[:len(solution)-1] 
+        for i in np.arange(1, len(self.micarray)):
+            mic = self.micarray[i]
+            pos = self.micarray[i].get_position()
+            ddoa = sound_speed * tdoa(mic.get_wave(),reference.get_wave())
+            mat_a.append([reference_pos[0]-pos[0], reference_pos[1]-pos[1], ddoa])
+            mat_b.append((reference_pos[0]**2 - pos[0]**2 + reference_pos[1]**2 - pos[1]**2 + ddoa**2)/2)
+
+        mat_a = np.array(mat_a)
+        mat_b = np.array(mat_b)
+        b = mat_b.transpose()
+
+        A = mat_a
+        At = A.transpose()
+        inv = np.linalg.inv(np.matmul(At, A))
+        solution = np.matmul( np.matmul(inv, At), b)
+
+        pos = np.array([solution[0], solution[1]])
+
+        self.sourcepos = pos
 
     def plot(self, error = 2, show = True, save = False, additional = [],  title = "plot.png"):
         """
@@ -211,7 +285,7 @@ class SensorArray:
 
 
         if(len(additional) != 0):
-            other= plt.Circle( (additional[0], additional[1]), radius = 0.01)
+            other= plt.Circle( (additional[0], additional[1]), radius = 0.02)
             other.set_color('b')
             ax.add_patch(other)
             art.append(other)
@@ -250,10 +324,10 @@ class SensorArray:
 
 
 class Microphone:
-	def __init__(self, position=[0.0, 0.0, 0.0], channel=1):
-		self.position = np.array(position)
-		self.channel = channel
-		self.wave= None
+    def __init__(self, position=[0.0, 0.0, 0.0], channel=1):
+    	self.position = np.array(position)
+    	self.channel = channel
+    	self.wave= None
 
 
     def set_wave(self, wave):
@@ -261,7 +335,7 @@ class Microphone:
         self.wave =  wave
 
 
-	def read_wave(filename='sound.wav'):
+    def read_wave(filename='sound.wav'):
         """
         Reads a file and creates a wave objec that is then assigned to the instance variable abs
         representing the wave
@@ -282,7 +356,7 @@ class Microphone:
         wav.normalize()
         self.wave = wav
 
-    def get_position():
+    def get_position( self ):
         return self.position
 
     def get_channel( self ):
@@ -305,15 +379,15 @@ class Microphone:
 
 
     def apply_filter(self, range):
-      '''
-      assumed always using the band_pass filter
-      '''
+        '''
+        assumed always using the band_pass filter
+        '''
         y = self.wave.ys
-        self.wave.ys = self.butter_bandpass_filter(data = y, lowcut = range[0], highcut = range[1],fs = self.framerate, order = 5)
+        self.wave.ys = self.butter_bandpass_filter(data = y, lowcut = range[0], highcut = range[1],fs = self.wave.framerate, order = 5)
 
 
 class Emitter:
-	def __init__(self, location= [0.0, 0.0, 0.0], noiselevel=0, tentry=0, texit=0):
+    def __init__(self, location= [0.0, 0.0, 0.0], noiselevel=0, tentry=0, texit=0):
         """
         Object that simulates an emmitter of sound through a channel.
 
@@ -323,13 +397,16 @@ class Emitter:
         #it is transmitted to the channels
         self.signal =None
 
-		self.location = np.array(location)
-		self.noiselevel = noiselevel
-		self.tentry =tentry
-		self.texit = texit
+        self.location = np.array(location)
+        self.noiselevel = noiselevel
+        self.tentry =tentry
+        self.texit = texit
+
+    def get_position(self):
+        return self.location
 
 
-	def read_file(filename='sound.wav'):
+    def read_file(filename='sound.wav'):
         """
         Reads a file with the original signal and sets the instance variable
         to the array
@@ -337,10 +414,10 @@ class Emitter:
             filename is a string and the file it denotes contains only one channel
 
         """
-		self.signal = dsp.read_wave(filename = filename)
+        self.signal = dsp.read_wave(filename = filename)
         self.apply_padding()
 
-    def set_wave( wave ):
+    def set_wave(self, wave ):
         """
         Sets the wave with the neccesary padding at the front and at the back
         that was established by the file
@@ -348,7 +425,7 @@ class Emitter:
         self.signal = wave
         self.apply_padding()
 
-    def apply_padding():
+    def apply_padding( self ):
         """
         Adds the neccesary padding to the signal instance variable.
         The variable used for the padding is that of the object when it is
@@ -356,15 +433,15 @@ class Emitter:
         """
         temp = self.signal.ys
 
-		#padding entry and exit time
-		pad_front = np.zeros(signal.framerate * tentry)
-		pad_back = np.zeros(signal.framerate * texit)
-		temp = np.concatenate((np.concatenate((pad_front, temp)), pad_back))
+        #padding entry and exit time
+        pad_front = np.zeros(int(self.signal.framerate * self.tentry))
+        pad_back = np.zeros(int(self.signal.framerate * self.texit))
+        temp = np.concatenate((np.concatenate((pad_front, temp)), pad_back))
 
         self.signal = dsp.Wave(temp, framerate= self.signal.framerate)
 
 
-    def emit(sensor):
+    def emit(self, sensor):
         """
         The function directly alters the state of the sensor array by passing
         wave objects to the microphones corresponding to what they would observe
@@ -378,9 +455,11 @@ class Emitter:
             final_waves.append(copy.deepcopy(self.signal))
 
         for i in np.arange(sensor.get_mic_number()):
-            mic = sensor.mic_array[i]
-            d = dist.euclidian(self.location, mic.get_position())
+            mic = sensor.micarray[i]
+            d = dist.euclidean(self.location, mic.get_position())
             dt = d/sound_speed
-            ds = np.floor(dt * self.signal.framerate)
+            ds = int(dt * self.signal.framerate)
             final_waves[i].roll(ds)
-            final_waves[i].ys =  final_waves[i].ys + np.random.normal(scale = noise_level, size = len(signal.ys))
+            final_waves[i].ys =  final_waves[i].ys + np.random.normal(scale = self.noiselevel, size = len(self.signal.ys))
+
+            mic.set_wave(final_waves[i])
