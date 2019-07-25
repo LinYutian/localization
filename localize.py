@@ -318,6 +318,7 @@ class SensorArray:
         if(show):
             plt.show()
 
+        plt.close(fig)
 
 
 
