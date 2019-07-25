@@ -81,8 +81,7 @@ def make_gausspulse(sfs ,iterations,fs):
     for i in range(iterations):
         final = np.concatenate((final,y))
 
-    wave = dsp.Wave(final, framerate= framerate)
-    return wave
+    return final
 
 
 
@@ -207,7 +206,7 @@ class SensorArray:
             Assumes: filename is a string in wav format and uses the specified passband
         """
         for mic in self.micarray:
-            mic.set_wave( filename )
+            mic.read_wave( filename )
 
     def set_sourcepos(self, pos):
         """Sets the position of the source manually"""
@@ -219,9 +218,10 @@ class SensorArray:
         for mic in self.micarray:
             mic.apply_filter(range = range)
 
-    def getemitter(self):
+    def find_loc(self):
         '''
-        the algorithm to trileterate is taken from stack exchange
+        the algorithm obtains the position of the source creating sound using
+        the method taken from stack exchange
         @https://math.stackexchange.com/questions/1722021/trilateration-using-tdoa
         '''
         mat_a = []
@@ -269,7 +269,7 @@ class SensorArray:
 
         #Defines the properties of the circle  representing the source both the error
         #and the actual predicted location
-        source_error = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = 1)
+        source_error = plt.Circle( (self.sourcepos[0], self.sourcepos[1]), radius = error)
         source_error.set_color('g')
         source_error.set_alpha(0.3)
         source_error.set_edgecolor('k')
@@ -406,7 +406,7 @@ class Emitter:
         return self.location
 
 
-    def read_file(filename='sound.wav'):
+    def read_file(self , filename='sound.wav'):
         """
         Reads a file with the original signal and sets the instance variable
         to the array
